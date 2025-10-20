@@ -1,0 +1,5 @@
+{
+  "name": "Environmental Impact Analyzer",
+  "description": "An AI-powered tool to evaluate the environmental impact of consumer products based on their descriptions. It provides a footprint score, a detailed breakdown, and suggests sustainable alternatives.",
+  "requestFramePermissions": []
+}
