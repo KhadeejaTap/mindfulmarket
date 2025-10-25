@@ -5,7 +5,7 @@ import ProductInputForm from './components/ProductInputForm';
 import ResultsDisplay from './components/ResultsDisplay';
 import { AnalysisResult } from './types';
 import { analyzeProduct } from './services/geminiService';
-import { storageService } from './services/storageService';
+import { browserStorage } from './services/browserStorage';
 
 
 const App: React.FC = () => {
@@ -21,25 +21,42 @@ const App: React.FC = () => {
     setAnalysisResult(null);
 
     try {
-        // 1. Check for similar analysis in storage
-        const cachedResult = await storageService.getSimilarAnalysis(productDescription);
-
-        if (cachedResult) {
-          console.log("Found similar analysis in cache!");
-          setAnalysisResult(cachedResult.analysisResult);
-        } else {
-          // 2. If not found, call Gemini
-          const result = await analyzeProduct(productDescription);
-          setAnalysisResult(result);
-          // 3. Store the new analysis
-          await storageService.saveAnalysis(productDescription, result);
+      let result;
+      
+      try {
+        // Try to get from browser storage first
+        const existingAnswer = await browserStorage.getAnswer(productDescription);
+        if (existingAnswer) {
+          console.log("Found cached analysis");
+          result = JSON.parse(existingAnswer);
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
-      } finally {
-        setIsLoading(false);
+      } catch (dbError) {
+        console.warn('Storage error:', dbError);
+        // Continue to API call if storage fails
       }
-    }, [productDescription]);
+
+      if (!result) {
+        // Make API call if no cached result
+        result = await analyzeProduct(productDescription);
+        try {
+          // Try to save to browser storage
+          await browserStorage.saveQuery(
+            productDescription, 
+            JSON.stringify(result)
+          );
+        } catch (saveError) {
+          console.warn('Failed to save to storage:', saveError);
+        }
+      }
+
+      setAnalysisResult(result);
+    } catch (err) {
+      console.error('Error during analysis:', err);
+      setError(err instanceof Error ? err.message : 'Analysis failed');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [productDescription]);
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
